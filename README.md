@@ -1,123 +1,78 @@
 # Heart Disease Prediction
 
-A machine learning project that predicts the presence of heart disease in patients using K-Nearest Neighbors (KNN) classification on clinical and demographic features.
-
----
+A machine learning project that predicts heart disease using k-Nearest Neighbors (k-NN) and XGBoost classifiers, trained on clinical patient data.
 
 ## Overview
 
-This project uses the [Heart Failure Prediction Dataset](https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction) (`heart.csv`) to build a binary classifier that predicts whether a patient has heart disease (`HeartDisease = 1`) or not (`HeartDisease = 0`). The workflow covers exploratory data analysis, data cleaning, feature selection, model training with hyperparameter tuning, and final evaluation.
+This project walks through a complete ML pipeline — from raw data to a tuned, evaluated model — using the `heart.csv` dataset (1,061 rows, 12 columns).
 
----
+## Pipeline
+
+1. **Data Import** — Load and inspect the dataset
+2. **Data Cleaning** — Remove duplicates, fix zero-value anomalies in `RestingBP` and `Cholesterol` by replacing them with group medians (split by heart disease status)
+3. **EDA** — Bar charts for categorical features; side-by-side comparisons vs. the `HeartDisease` target; correlation heatmap
+4. **Preprocessing** — One-hot encoding of categorical columns; feature selection based on correlation threshold (> 0.3); `MinMaxScaler` normalization
+5. **Modeling**
+   - k-NN trained on individual features, then all selected features combined
+   - Hyperparameter tuning via `GridSearchCV` over `n_neighbors` (1–19) and distance metrics (`minkowski`, `manhattan`)
+   - XGBoost classifier with feature importance analysis and manual tuning
+6. **Evaluation** — Accuracy score, classification report, and confusion matrix
+
+## Selected Features
+
+```
+MaxHR, Oldpeak, ExerciseAngina_Y, Sex_M, ST_Slope_Flat, ST_Slope_Up
+```
+
+## Tech Stack
+
+| Library | Purpose |
+|---|---|
+| `pandas` / `numpy` | Data manipulation |
+| `matplotlib` / `seaborn` | Visualization |
+| `scikit-learn` | k-NN, scaling, grid search, metrics |
+| `xgboost` | Gradient boosting classifier |
+
+## Key Findings
+
+### Dataset
+- 1,061 patients, 12 features — no missing values, but 143 duplicates removed
+- `RestingBP` had 1 zero-value row (dropped); `Cholesterol` had many zeros, replaced with group medians split by heart disease status
+- Final cleaned dataset: **917 rows**
+
+### Best Single Feature (k-NN, k=3)
+| Feature | Accuracy |
+|---|---|
+| ST_Slope_Up | 80.98% |
+| ST_Slope_Flat | 78.26% |
+| ExerciseAngina_Y | 71.20% |
+| Oldpeak | 70.65% |
+| Sex_M | 55.98% |
+| MaxHR | 54.89% |
+
+### Model Comparison (Test Set, 80/20 split)
+
+| Model | Accuracy | Precision | Recall | F1 |
+|---|---|---|---|---|
+| k-NN (tuned, k=18, Minkowski) | 83.70% | 0.84 | 0.84 | 0.84 |
+| XGBoost (baseline) | 84.24% | 0.84 | 0.84 | 0.84 |
+| XGBoost (tuned) | **88.04%** | **0.88** | **0.88** | **0.88** |
+
+### Takeaways
+- `ST_Slope` was the most predictive single feature, outperforming `MaxHR` and `Sex` by a wide margin
+- Combining all 6 selected features in k-NN boosted accuracy from ~81% (best single feature) to 83.7%
+- XGBoost with tuned hyperparameters (`n_estimators=200`, `learning_rate=0.05`, `max_depth=3`) achieved the best overall result at **88%** accuracy
+
+## Getting Started
+
+```bash
+pip install pandas numpy matplotlib seaborn scikit-learn xgboost
+```
+
+Place `heart.csv` in the same directory as the notebook, then run all cells in order.
 
 ## Dataset
 
-The dataset contains 918 patient records with the following features:
+The project expects a CSV file named `heart.csv` with columns including `Age`, `Sex`, `ChestPainType`, `RestingBP`, `Cholesterol`, `FastingBS`, `RestingECG`, `MaxHR`, `ExerciseAngina`, `Oldpeak`, `ST_Slope`, and `HeartDisease` (target).
 
-| Feature | Description |
-|---|---|
-| `Age` | Age of the patient (years) |
-| `Sex` | Sex of the patient (M/F) |
-| `ChestPainType` | Type of chest pain (ATA, NAP, ASY, TA) |
-| `RestingBP` | Resting blood pressure (mm Hg) |
-| `Cholesterol` | Serum cholesterol (mg/dL) |
-| `FastingBS` | Fasting blood sugar > 120 mg/dL (1 = true, 0 = false) |
-| `RestingECG` | Resting electrocardiogram results |
-| `MaxHR` | Maximum heart rate achieved |
-| `ExerciseAngina` | Exercise-induced angina (Y/N) |
-| `Oldpeak` | ST depression induced by exercise |
-| `ST_Slope` | Slope of the peak exercise ST segment (Up, Flat, Down) |
-| `HeartDisease` | Target variable (1 = heart disease, 0 = normal) |
-
----
-
-## Project Structure
-
-```
-Heart-Disease-Prediction/
-│
-├── main.ipynb       # Main Jupyter notebook with full pipeline
-├── heart.csv        # Dataset (not included — see Dataset section)
-└── README.md        # This file
-```
-
----
-
-## Methodology
-
-### 1. Exploratory Data Analysis
-- Distribution plots for all categorical features
-- Cross-tab countplots of each categorical feature against the target (`HeartDisease`)
-
-### 2. Data Cleaning
-- Removed rows with `RestingBP == 0` (physiologically impossible)
-- Imputed `Cholesterol == 0` values with the **median cholesterol**, computed separately for patients with and without heart disease to prevent target leakage
-
-### 3. Feature Engineering
-- Applied one-hot encoding (`pd.get_dummies`) to categorical columns with `drop_first=True`
-- Computed a correlation heatmap (absolute values) to identify predictive features
-- Filtered features with correlation > 0.3 relative to the target
-
-### 4. Feature Selection
-The following features were selected for the final model based on univariate KNN experiments and correlation analysis:
-
-- `MaxHR` — Maximum heart rate
-- `Oldpeak` — ST depression
-- `ExerciseAngina_Y` — Exercise-induced angina (encoded)
-- `ST_Slope_Flat` — Flat ST slope (encoded)
-- `ST_Slope_Up` — Upward ST slope (encoded)
-
-> **Note:** `Sex_M` was tested but excluded from the final model after inspecting its individual contribution.
-
-### 5. Model Training & Hyperparameter Tuning
-- Features scaled using `MinMaxScaler`
-- Hyperparameter search via `GridSearchCV` over:
-  - `n_neighbors`: 1–19
-  - `metric`: `minkowski`, `manhattan`
-- Best parameters selected by cross-validated accuracy
-
-### 6. Evaluation
-- Final model evaluated on a held-out test set (80/20 split, `random_state=417`)
-- Metrics reported: **accuracy score** and **confusion matrix**
-
----
-
-## Requirements
-
-```
-pandas
-numpy
-matplotlib
-seaborn
-scikit-learn
-```
-
-Install dependencies:
-
-```bash
-pip install pandas numpy matplotlib seaborn scikit-learn
-```
-
----
-
-## Usage
-
-1. Clone the repository and place `heart.csv` in the project root
-2. Open `main.ipynb` in Jupyter or VS Code
-3. Run all cells sequentially
-
-```bash
-jupyter notebook main.ipynb
-```
-
----
-
-## Results
-
-The KNN classifier achieved competitive accuracy on the test set after grid search tuning. The confusion matrix revealed the model's performance on both true positive (heart disease detected) and true negative (healthy patient classified correctly) cases.
-
----
-
-## License
-
-This project is for educational purposes. The dataset is sourced from [Kaggle](https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction) and is available under its original license.
+A compatible dataset is available on [Kaggle — Heart Failure Prediction](https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction).
